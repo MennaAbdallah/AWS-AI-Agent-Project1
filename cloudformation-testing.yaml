@@ -1,0 +1,53 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Amazon Bedrock Evaluations - S3 Bucket and IAM Role Resources'
+
+Resources:
+  EvalDatasetBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'udacity-agentic-engineer-c1-eval-${AWS::AccountId}'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  BedrockEvalRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'bug-report-testing-eval-role-${AWS::Region}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: bedrock.amazonaws.com
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref 'AWS::AccountId'
+      Policies:
+        - PolicyName: BedrockEvalS3Policy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:ListBucket
+                Resource:
+                  - !GetAtt EvalDatasetBucket.Arn
+                  - !Sub '${EvalDatasetBucket.Arn}/*'
+              - Effect: Allow
+                Action:
+                  - bedrock:InvokeModel
+                Resource: !Sub 'arn:aws:bedrock:${AWS::Region}::foundation-model/amazon.nova-pro-v1:0'
+
+Outputs:
+  EvalDatasetBucketName:
+    Value: !Ref EvalDatasetBucket
+    Description: S3 Bucket Name for Evaluation Datasets and Output Results
+  BedrockEvalRoleArn:
+    Value: !GetAtt BedrockEvalRole.Arn
+    Description: IAM Role ARN for Bedrock Evaluations
