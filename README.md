@@ -1,7 +1,13 @@
-AWS Bedrock AgentCore Customer Support Chatbot (AWS-AI-Agent-Project1)
-A customer support chatbot built on the Amazon Bedrock AgentCore managed harness. The system classifies customer inquiries using a single system prompt, handles multi-turn stateful slot filling for bug reporting, grounds store policy questions in an embedded FAQ, and persists engineering tickets to DynamoDB via an AgentCore Gateway and AWS Lambda tool execution.
+Markdown
+# AWS Bedrock AgentCore Customer Support Chatbot (`AWS-AI-Agent-Project1`)
 
-Architecture & Data Flow
+A customer support chatbot built on the **Amazon Bedrock AgentCore** managed harness. The system classifies customer inquiries using a single system prompt, handles multi-turn stateful slot filling for bug reporting, grounds store policy questions in an embedded FAQ, and persists engineering tickets to DynamoDB via an AgentCore Gateway and AWS Lambda tool execution.
+
+---
+
+## Architecture & Data Flow
+
+```text
                                 +-----------------------------------+
                                 |     Client App / CLI (chat.py)    |
                                 +-----------------+-----------------+
