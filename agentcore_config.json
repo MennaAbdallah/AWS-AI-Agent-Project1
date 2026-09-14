@@ -1,0 +1,11 @@
+{
+  "region": "us-east-1",
+  "lambda_arn": "arn:aws:lambda:us-east-1:345353336887:function:bug-report-tool-stack-create-bug-report",
+  "gateway_role_arn": "arn:aws:iam::345353336887:role/bug-report-tool-stack-gateway-role",
+  "harness_role_arn": "arn:aws:iam::345353336887:role/bug-report-tool-stack-harness-role",
+  "table_name": "bug-report-tool-stack-bug-reports",
+  "model_id": "us.amazon.nova-pro-v1:0",
+  "system_prompt_length": 10014,
+  "harnessArn": "arn:aws:lambda:us-east-1:345353336887:function:bug-report-tool-stack-create-bug-report",
+  "harness_arn": "arn:aws:lambda:us-east-1:345353336887:function:bug-report-tool-stack-create-bug-report"
+}

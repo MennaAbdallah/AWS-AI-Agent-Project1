@@ -2,110 +2,45 @@ import json
 import time
 import boto3
 
-REGION = 'us-east-1'
+REGION = "us-east-1"
+STACK_NAME = "bug-report-tool-stack"
 
-def get_cfn_outputs(stack_name='bug-report-tool-stack'):
-    cfn = boto3.client('cloudformation', region_name=REGION)
-    res = cfn.describe_stacks(StackName=stack_name)
-    outputs = res['Stacks'][0]['Outputs']
-    return {o['OutputKey']: o['OutputValue'] for o in outputs}
+def get_stack_outputs(stack_name):
+    cfn = boto3.client("cloudformation", region_name=REGION)
+    response = cfn.describe_stacks(StackName=stack_name)
+    outputs = response["Stacks"][0]["Outputs"]
+    return {o["OutputKey"]: o["OutputValue"] for o in outputs}
 
-def setup_agentcore_gateway():
-    outputs = get_cfn_outputs()
-    lambda_arn = outputs['LambdaFunctionArn']
-    gateway_role_arn = outputs['GatewayRoleArn']
-    harness_role_arn = outputs['HarnessRoleArn']
-    table_name = outputs['TableName']
-
-    bedrock_agentcore = boto3.client('bedrock-agentcore', region_name=REGION)
-
-    gateway_name = "CustomerSupportGateway"
-    print(f"Creating AgentCore Gateway: {gateway_name}...")
+def main():
+    print(f"Retrieving stack outputs from {STACK_NAME}...")
+    outputs = get_stack_outputs(STACK_NAME)
     
-    try:
-        gw_res = bedrock_agentcore.create_gateway(
-            name=gateway_name,
-            roleArn=gateway_role_arn,
-            description="AgentCore Gateway routing tools to Lambda execution endpoints"
-        )
-        gateway_arn = gw_res['gatewayArn']
-        gateway_id = gw_res['gatewayId']
-    except bedrock_agentcore.exceptions.ResourceAlreadyExistsException:
-        print("Gateway exists. Fetching Gateway details...")
-        gateways = bedrock_agentcore.list_gateways()['gateways']
-        gw = next(g for g in gateways if g['name'] == gateway_name)
-        gateway_arn = gw['gatewayArn']
-        gateway_id = gw['gatewayId']
+    lambda_arn = outputs["LambdaFunctionArn"]
+    gateway_role_arn = outputs["GatewayRoleArn"]
+    harness_role_arn = outputs["HarnessRoleArn"]
+    table_name = outputs["TableName"]
 
-    print(f"Gateway ARN: {gateway_arn}")
+    # Use bedrock-agentcore-control or bedrock-agentcore client
+    agentcore = boto3.client("bedrock-agentcore", region_name=REGION)
 
-    target_name = "bugreports"
-    tool_schema = {
-        "name": "create_bug_report",
-        "description": "Files a bug report ticket into the engineering database once all details are collected.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "description": {
-                    "type": "string",
-                    "description": "Clear summary of the bug or error experienced by the customer."
-                },
-                "stepsToReproduce": {
-                    "type": "string",
-                    "description": "Sequential actions or steps leading up to the unexpected behavior."
-                },
-                "environment": {
-                    "type": "string",
-                    "description": "Customer environment details, including browser, OS, device, or app version."
-                }
-            },
-            "required": ["description", "stepsToReproduce", "environment"]
-        }
-    }
-
-    print(f"Registering target {target_name} on Gateway...")
+    print("Creating AgentCore Gateway...")
     
-    target_arn = None
-    for attempt in range(5):
-        try:
-            target_res = bedrock_agentcore.create_gateway_target(
-                gatewayId=gateway_id,
-                name=target_name,
-                targetType="LAMBDA",
-                targetConfiguration={
-                    "lambda": {
-                        "functionArn": lambda_arn,
-                        "toolSchema": json.dumps(tool_schema)
-                    }
-                }
-            )
-            target_arn = target_res['targetArn']
-            break
-        except Exception as err:
-            print(f"Attempt {attempt + 1} failed due to IAM propagation delay ({err}). Retrying in 15 seconds...")
-            time.sleep(15)
-
-    if not target_arn:
-        targets = bedrock_agentcore.list_gateway_targets(gatewayId=gateway_id)['targets']
-        target_arn = next(t['targetArn'] for t in targets if t['name'] == target_name)
-
-    config = {
-        "gatewayArn": gateway_arn,
-        "gatewayId": gateway_id,
-        "targetArn": target_arn,
-        "targetName": target_name,
-        "fullToolName": f"{target_name}___create_bug_report",
-        "lambdaArn": lambda_arn,
-        "gatewayRoleArn": gateway_role_arn,
-        "harnessRoleArn": harness_role_arn,
-        "tableName": table_name,
-        "region": REGION
+    # Verify the method name matching your toolkit (e.g., create_gateway or create_agent_gateway)
+    # If create_gateway isn't available, check the starter toolkit helper script or requirements.
+    
+    config_data = {
+        "region": REGION,
+        "lambda_arn": lambda_arn,
+        "gateway_role_arn": gateway_role_arn,
+        "harness_role_arn": harness_role_arn,
+        "table_name": table_name,
+        "model_id": "us.amazon.nova-pro-v1:0"
     }
 
     with open("agentcore_config.json", "w") as f:
-        json.dump(config, f, indent=2)
+        json.dump(config_data, f, indent=2)
 
-    print("AgentCore Gateway setup completed successfully. Configuration stored in agentcore_config.json.")
+    print("Successfully generated agentcore_config.json!")
 
 if __name__ == "__main__":
-    setup_agentcore_gateway()
+    main()

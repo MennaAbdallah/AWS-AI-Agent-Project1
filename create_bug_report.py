@@ -4,41 +4,65 @@ import uuid
 from datetime import datetime, timezone
 import boto3
 
-dynamodb = boto3.resource('dynamodb', region_name='us-east-1')
-TABLE_NAME = os.environ.get('TABLE_NAME', 'bug-report-tool-stack-bug-reports')
-table = dynamodb.Table(TABLE_NAME)
+table = boto3.resource("dynamodb").Table(os.environ["TABLE_NAME"])
 
-def lambda_handler(event, context):
-    """
-    AgentCore Gateway target handler for bug reports.
-    Accepts raw JSON tool input parameters directly from the gateway harness.
-    """
-    print("Received event payload:", json.dumps(event))
+def lambda_handler(event, _):
+    print("EVENT:", json.dumps(event, indent=2, default=str))
 
-    description = event.get('description', '').strip()
-    steps_to_reproduce = event.get('stepsToReproduce', '').strip()
-    environment = event.get('environment', '').strip()
+    # 1. Handle flat payload (passed by Bedrock Runtime converse tool use or Lambda Console test)
+    if "description" in event or "stepsToReproduce" in event:
+        body = event
+    # 2. Handle Agent Core / Agents Classic enveloped payload structure if present
+    elif event.get("parameters"):
+        params = event.get("parameters") or []
+        body = {
+            p.get("name"): p.get("value")
+            for p in params
+            if isinstance(p, dict) and p.get("name") is not None
+        }
+    else:
+        body = event
 
-    ticket_id = f"TICKET-{uuid.uuid4().hex[:8].upper()}"
-    created_at = datetime.now(timezone.utc).isoformat()
+    description = (body.get("description") or "").strip()
+    steps = (body.get("stepsToReproduce") or "").strip()
+    environment = (body.get("environment") or "").strip()
 
+    if not description:
+        return _resp(event, {"error": "missing", "field": "description"})
+
+    ticket_id = str(uuid.uuid4())
     item = {
-        'ticketId': ticket_id,
-        'description': description or 'Unspecified issue description',
-        'stepsToReproduce': steps_to_reproduce or 'Not specified',
-        'environment': environment or 'Not specified',
-        'status': 'OPEN',
-        'createdAt': created_at
+        "ticketId": ticket_id,
+        "description": description,
+        "stepsToReproduce": steps,
+        "environment": environment,
+        "status": "OPEN",
+        "createdAt": datetime.now(timezone.utc).isoformat(),
     }
 
-    try:
-        table.put_item(Item=item)
-        print(f"Successfully recorded ticket {ticket_id} in DynamoDB table {TABLE_NAME}")
-        return {
-            'ticketId': ticket_id,
-            'status': 'OPEN',
-            'message': f"Ticket {ticket_id} created successfully."
-        }
-    except Exception as e:
-        print(f"Failed to record ticket: {str(e)}")
-        raise e
+    table.put_item(Item=item)
+
+    # Return structure that works seamlessly with Bedrock / Lambda
+    response_data = {"ticketId": ticket_id, "status": "OPEN"}
+    
+    if event.get("messageVersion") == "1.0":
+        return _resp(event, response_data)
+    
+    return response_data
+
+
+def _resp(event, obj):
+    return {
+        "messageVersion": "1.0",
+        "response": {
+            "actionGroup": event.get("actionGroup"),
+            "function": event.get("function"),
+            "functionResponse": {
+                "responseBody": {
+                    "TEXT": {
+                        "body": json.dumps(obj)
+                    }
+                }
+            },
+        },
+    }

@@ -1,0 +1,13 @@
+{
+    "flowInputNode": {
+      "nodeName": "Flow input"
+    },
+    "tests": [
+      {
+        "id": "test-1",
+        "prompt": "The checkout page crashes when I click Pay.",
+        "expected": "Bug report ticket created."
+      }
+    ]
+  }
+  
