@@ -201,3 +201,8 @@ aws s3 rm s3://<EvalDatasetBucketName> --recursive --region us-east-1
 # 3. Delete CloudFormation Stacks
 aws cloudformation delete-stack --stack-name bug-report-testing-stack --region us-east-1
 aws cloudformation delete-stack --stack-name bug-report-tool-stack --region us-east-1
+
+## Screenshots:
+# 1. chat.py
+<img width="777" height="338" alt="image" src="https://github.com/user-attachments/assets/d929291b-4576-4143-9b73-376a229a3a3a" />
+ 
