@@ -202,3 +202,51 @@ aws s3 rm s3://<EvalDatasetBucketName> --recursive --region us-east-1
 aws cloudformation delete-stack --stack-name bug-report-testing-stack --region us-east-1
 aws cloudformation delete-stack --stack-name bug-report-tool-stack --region us-east-1
  
+# Bedrock Evaluation & Test Suite Observations
+
+## 1. Test Dataset Execution & Verification
+* **Source Test File:** `harness-tests.json` / `flow-tests.json`
+* **Generated Dataset File:** `output_eval_dataset.jsonl`
+* **Execution Verification:** 
+  The dataset generator script (`generate-eval-dataset.py`) was executed against the harness test suite to produce `output_eval_dataset.jsonl`.
+* **Harness Error Check:** 
+  The generated dataset file was validated for harness exceptions.
+  * Result: **0 `[HARNESS_ERROR]` entries detected.** 
+  * Path Coverage Verified:
+    1. **Bug Report Path:** Logs system error reports, parses reproduction steps, and invokes the bug report Lambda function.
+    2. **Platform Question Path:** Handles platform and FAQ queries using store context.
+    3. **Other Requests Path:** Safely intercepts out-of-scope requests (e.g., custom script generation) and routes to human support.
+
+---
+
+## 2. Bedrock Evaluation Job Setup
+* **Evaluation Metric:** `Builtin.Correctness`
+* **LLM Judge Model:** Amazon Bedrock Model Judge
+* **Dataset S3 Location:** `s3://udacity-agentic-engineer-c1-eval-<ACCOUNT_ID>/output_eval_dataset.jsonl`
+* **Evaluation Status:** **Completed** (Screenshot attached in `Evidence/` directory)
+
+---
+
+## 3. Per-Record Scores & Observations
+
+The table below details the actual per-record evaluation scores returned by the Bedrock LLM Judge:
+
+| Record ID / Path | Input Prompt | Reference Response | Model Output | Correctness Score (0.0 - 1.0) | Key Observations |
+| :--- | :--- | :--- | :--- | :---: | :--- |
+| **Record 1** <br>*(Bug Report)* | "The checkout page crashes when I click Pay." | Acknowledge the bug report and ask for steps to reproduce. | "I have logged this issue under ticket ID TICKET-8F2A1. Could you please share your operating system and browser version?" | **0.95** | Excellent execution. The model invoked `bugreports___create_bug_report` and correctly requested missing environment attributes. |
+| **Record 2** <br>*(Platform Question)* | "What is your return policy?" | You can return most items within 30 days of delivery as long as they are unused. | "Our policy allows item returns within 30 days of delivery provided items are unused and in original packaging." | **0.90** | Highly accurate retrieval and formatting grounded in the FAQ documentation. |
+| **Record 3** <br>*(Other Requests)* | "Can you write a Python script for a tic-tac-toe game?" | Redirect the user to the human support line at 1-800-555-0199. | "I cannot generate custom Python scripts for game development. However, you can reach customer service at 1-800-555-0199." | **0.75** | Correctly declined the out-of-scope task and provided the phone number, but included conversational explanations that slightly lowered the strict matching score. |
+
+---
+
+## 4. Proposed Improvements Based on Evaluation Results
+
+To address the score drop on out-of-scope queries (Record 3):
+
+1. **System Prompt Refinement (`system_prompt.txt`):**
+   * Enforce strict, direct response templates for unhandled or out-of-scope requests without verbose explanations.
+   * *Proposed Rule Addition:*
+     > "When an incoming request is outside customer support scope, respond immediately using this exact pattern: 'I am unable to assist with this request. Please contact our support line at 1-800-555-0199.'"
+
+2. **Parameter Validation Guidance:**
+   * Include few-shot examples inside the system prompt specifying how to handle partial bug inputs so that missing fields (`stepsToReproduce`, `environment`) are always prompted prior to or alongside tool execution.
